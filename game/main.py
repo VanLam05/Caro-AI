@@ -3,7 +3,6 @@ import sys
 import os
 
 from .board import Board
-from models.agentRandom import AgentRandom
 from models.agentMiniMax import AgentMiniMax
 from .buttons import Button
 
