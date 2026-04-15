@@ -514,10 +514,17 @@ def main():
                     done = True
             
             elif game.state == GAME_OVER:
+                # Undo button - go back to previous move
+                if undo_button.draw(Screen):
+                    undo_move()
+                    game.state = PLAYING
+                
                 # Replay button - reset and stay in SETUP to allow mode re-selection
                 if replay_button.draw(Screen):
                     game.board.reset()
                     game.game_started = False
+                    game.game_over = False
+                    game.winner = 0
                     game.state = SETUP
                     update_button_states()
         
