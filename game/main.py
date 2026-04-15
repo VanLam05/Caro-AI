@@ -5,6 +5,7 @@ import random
 
 from .board import Board
 from models.agentRandom import AgentRandom
+from models.agentMiniMax import AgentMiniMax
 from .buttons import Button
 
 
@@ -199,13 +200,6 @@ game = GameState()
 
 
 # ====================== UTILITY FUNCTIONS ======================
-# def draw_logo():
-#     """Draw logo text"""
-#     font = pygame.font.Font('freesansbold.ttf', 36)
-#     text = font.render('By nhóm 2', True, WHITE, BLACK)
-#     textRect = text.get_rect()
-#     textRect.center = (1100, 700)
-#     Screen.blit(text, textRect)
 
 
 def draw_board():
@@ -522,13 +516,26 @@ def main():
                         game.state = PLAYING
                         game.game_started = True
                         if not game.is_pvp:
-                            game.agent = AgentRandom(game.board)
+                            # Select agent based on difficulty
+                            if game.difficulty == 0:  # Easy - Random moves
+                                game.agent = AgentRandom(game.board)
+                            elif game.difficulty == 1:  # Medium (1) - Minimax
+                                game.agent = AgentMiniMax(game.board, max_depth=3)
+                            else:  # Hard (2) - Minimax
+                                game.agent = AgentMiniMax(game.board, max_depth=5)
                         update_button_states()
-                        if game.board.make_move(row, col):
-                            game.winner = game.board.get_winner()
-                            if game.winner != 0:
-                                game.game_over = True
-                                game.state = GAME_OVER
+                        
+                        # Set initial turn based on human_first setting
+                        if game.human_first:
+                            # Human goes first - make move at clicked position
+                            if game.board.make_move(row, col):
+                                game.winner = game.board.get_winner()
+                                if game.winner != 0:
+                                    game.game_over = True
+                                    game.state = GAME_OVER
+                        else:
+                            # AI goes first - set turn to AI and don't make move yet
+                            game.board.turn = PLAYER_AI
             
             elif game.state == PLAYING:
                 result = handle_playing_state(event)
