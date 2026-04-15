@@ -1,4 +1,4 @@
-from ..game.board import Board
+from game.board import Board
 import copy 
 import random
 
@@ -9,6 +9,7 @@ class AgentRandom:
         self.board = board
 
     def get_move(self):
+        
         """ Get a random move from the available moves on the board """
         possible_moves = self.board.get_possible_moves()
         if not possible_moves:

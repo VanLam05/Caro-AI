@@ -31,7 +31,7 @@ class Button():
 			self.clicked = False
 
 		#draw button on screen
-		if (self.is_disable == False):
+		if (self.is_disable == True):
 			surface.blit(self.image, (self.rect.x, self.rect.y))
 		else:
 			surface.blit(self.gray_image, (self.rect.x, self.rect.y))
@@ -47,7 +47,7 @@ class Button():
 		self.is_disable = False
 
 	def re_draw(self, surface):
-		if (self.is_disable == False):
+		if (self.is_disable == True):
 			surface.blit(self.image, (self.rect.x, self.rect.y))
 		else:
 			surface.blit(self.gray_image, (self.rect.x, self.rect.y))

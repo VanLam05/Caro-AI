@@ -1,4 +1,3 @@
-import numpy as np 
 
 
 class Board(object):
@@ -21,7 +20,7 @@ class Board(object):
 
         self.rows = rows
         self.cols = cols
-        self.grid = np.zeros((rows, cols), dtype=int)
+        self.grid = [[0 for _ in range(cols)] for _ in range(rows)]
 
         self.winning_condition = winning_condition
 
@@ -39,7 +38,7 @@ class Board(object):
 
     def reset(self):
         """ Reset the board to the initial state """
-        self.grid = np.zeros((self.rows, self.cols), dtype=int)
+        self.grid = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
         self.turn = self.originXO
 
         self.your_turn = self.originXO
@@ -93,17 +92,12 @@ class Board(object):
         return True
     
     def getRow(self, x: int):
-        
-        y_min = max(0, x - self.winning_condition + 1)
-        y_max = min(self.cols - 1, x + self.winning_condition - 1)
-
-        return self.grid[x][y_min:y_max + 1]
+        """ Get entire row at index x """
+        return self.grid[x]
     
     def getCol(self, y: int):
-        x_min = max(0, y - self.winning_condition + 1)
-        x_max = min(self.rows - 1, y + self.winning_condition - 1)
-
-        return self.grid[x_min:x_max + 1][:, y]
+        """ Get entire column at index y """
+        return [self.grid[i][y] for i in range(self.rows)]
     
     def getMainDiagonal(self, x: int, y: int):
         diag = []
@@ -113,7 +107,7 @@ class Board(object):
             if 0 <= new_x < self.rows and 0 <= new_y < self.cols:
                 diag.append(self.grid[new_x][new_y])
         
-        return np.array(diag)
+        return diag
     
     def getAntiDiagonal(self, x: int, y: int):
         anti_diag = []
@@ -123,9 +117,9 @@ class Board(object):
             if 0 <= new_x < self.rows and 0 <= new_y < self.cols:
                 anti_diag.append(self.grid[new_x][new_y])
         
-        return np.array(anti_diag)
+        return anti_diag
     
-    def count_consecutive(self, line: np.array, player: int):
+    def count_consecutive(self, line: list, player: int):
         max_count = 0
         current_count = 0
 
@@ -137,6 +131,29 @@ class Board(object):
                 current_count = 0
 
         return max_count
+
+    def check_winning(self, x: int, y: int, player: int) -> bool:
+        """
+        Check if placing a piece at (x, y) for the given player results in a win
+        Returns True if it's a winning move, False otherwise
+        """
+        # Get all 4 directions
+        row = self.grid[x]
+        col = [self.grid[i][y] for i in range(self.rows)]
+        main_diag = self.getMainDiagonal(x, y)
+        anti_diag = self.getAntiDiagonal(x, y)
+        
+        # Check each direction for winning condition
+        if self.count_consecutive(row, player) >= self.winning_condition:
+            return True
+        if self.count_consecutive(col, player) >= self.winning_condition:
+            return True
+        if self.count_consecutive(main_diag, player) >= self.winning_condition:
+            return True
+        if self.count_consecutive(anti_diag, player) >= self.winning_condition:
+            return True
+        
+        return False
 
     def get_winner(self):
         """
@@ -153,16 +170,7 @@ class Board(object):
         last_move = self.move_history[-1]  # Get the last move
         x, y, player = last_move
 
-        if self.count_consecutive(self.getRow(x), player) >= self.winning_condition:
-            return player
-        
-        if self.count_consecutive(self.getCol(y), player) >= self.winning_condition:
-            return player
-        
-        if self.count_consecutive(self.getMainDiagonal(x, y), player) >= self.winning_condition:
-            return player
-        
-        if self.count_consecutive(self.getAntiDiagonal(x, y), player) >= self.winning_condition:
+        if self.check_winning(x, y, player):
             return player
         
         if self.is_draw():
