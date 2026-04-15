@@ -1,7 +1,6 @@
 import pygame 
 import sys
 import os
-import random
 
 from .board import Board
 from models.agentRandom import AgentRandom
@@ -146,6 +145,11 @@ icon_img = pygame.transform.smoothscale(
     (20, 20)
 )
 
+click_to_start_img = pygame.transform.smoothscale(
+    pygame.image.load(path + '/click_to_start.png').convert_alpha(), 
+    (400, 200)
+)
+
 # ====================== CREATE BUTTONS ======================
 pvp_btn = Button(1075, 145, pvp_img, pvp_img_gray, 0.8)
 aivp_btn = Button(970, 145, aivp_img, aivp_img_gray, 0.8)
@@ -179,6 +183,11 @@ class GameState:
         self.ai_think_start_time = None  # Track when AI started thinking
         self.ai_thinking_duration = 500  # milliseconds to wait while thinking
         self.selected_cell = None  # Track selected cell for preview (row, col) or None
+        self.blink_time = pygame.time.get_ticks()  # Track time for blinking animation
+        self.show_click_to_start = True  # Toggle for blinking effect
+        self.scale_time = pygame.time.get_ticks()  # Track time for scale animation
+        self.scale_progress = 0  # Progress from 0 to 1 for scale animation
+        self.scale_direction = 1  # 1 for scaling up, -1 for scaling down
     
     def can_setup(self):
         """Check if we can still change setup (no moves made yet)"""
@@ -483,6 +492,26 @@ def draw_current_state():
     # Always draw board and buttons
     draw_board()
     
+    # Draw "click to start" asset in SETUP state with bouncing animation
+    if game.state == SETUP:
+        # Calculate center position for click to start image
+        board_center_x = (MARGIN + WIDTH) * COLNUM / 2
+        board_center_y = (MARGIN + HEIGHT) * ROWNUM / 2
+        
+        # Apply bouncing scale animation (0.8 to 1.2)
+        scale_factor = 0.8 + (game.scale_progress * 0.4)  # 0.8 + (0 to 1) * 0.4 = 0.8 to 1.2
+        scaled_width = int(click_to_start_img.get_width() * scale_factor)
+        scaled_height = int(click_to_start_img.get_height() * scale_factor)
+        scaled_img = pygame.transform.smoothscale(click_to_start_img, (scaled_width, scaled_height))
+        
+        # Apply 70% opacity (0.7 alpha)
+        scaled_img.set_alpha(int(255 * 0.7))
+        
+        click_x = int(board_center_x - scaled_width / 2)
+        click_y = int(board_center_y - scaled_height / 2)
+        
+        Screen.blit(scaled_img, (click_x, click_y))
+    
     # Draw control buttons
     undo_button.draw(Screen)
     exit_button.draw(Screen)
@@ -542,6 +571,7 @@ def main():
                         game.state = PLAYING
                         game.game_started = True
                         game.selected_cell = None  # Clear any selection
+                        game.show_click_to_start = False  # Hide "click to start" asset
                         if not game.is_pvp:
                             # Select agent based on difficulty
                             if game.difficulty == 0:  # Easy - Random moves
@@ -586,6 +616,13 @@ def main():
                 ai_thinking_btn.disable_button()  # Bright
             else:
                 ai_thinking_btn.enable_button()  # Gray
+        
+        # Update scale animation for bouncing effect (1000ms cycle: 500ms up, 500ms down)
+        current_time = pygame.time.get_ticks()
+        elapsed_scale = (current_time - game.scale_time) % 1000  # Repeat every 1000ms
+        game.scale_progress = elapsed_scale / 500.0  # Normalize to 0-2 range
+        if game.scale_progress > 1:
+            game.scale_progress = 2 - game.scale_progress  # Mirror back down (1 to 0)
         
         # AI turn in playing state
         if game.state == PLAYING and not game.is_pvp and not game.game_over and game.board.turn == PLAYER_AI:
