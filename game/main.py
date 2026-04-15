@@ -174,6 +174,8 @@ class GameState:
         self.ai_thinking = False
         self.game_over = False
         self.game_started = False  # True if game has started
+        self.ai_think_start_time = None  # Track when AI started thinking
+        self.ai_thinking_duration = 500  # milliseconds to wait while thinking
     
     def can_setup(self):
         """Check if we can still change setup (no moves made yet)"""
@@ -264,18 +266,35 @@ def draw_game_over_screen():
 
 
 def make_ai_move():
-    """Make AI move"""
-    if game.agent and game.board.turn == PLAYER_AI and not game.game_over:
+    """Make AI move with non-blocking timer"""
+    if not game.agent or game.board.turn != PLAYER_AI or game.game_over:
+        return
+    
+    # Start thinking timer if not already started
+    if not game.ai_thinking:
         game.ai_thinking = True
-        pygame.time.delay(500)
-        move = game.agent.get_move()
-        if move:
-            game.board.make_move(move[0], move[1])
-            game.winner = game.board.get_winner()
-            if game.winner != 0:
-                game.game_over = True
-                game.state = GAME_OVER
-        game.ai_thinking = False
+        game.ai_think_start_time = pygame.time.get_ticks()
+        return
+    
+    # Check if enough time has passed
+    current_time = pygame.time.get_ticks()
+    elapsed = current_time - game.ai_think_start_time
+    
+    if elapsed < game.ai_thinking_duration:
+        # Still thinking, don't make move yet
+        return
+    
+    # Time's up, make the move
+    move = game.agent.get_move()
+    if move:
+        game.board.make_move(move[0], move[1])
+        game.winner = game.board.get_winner()
+        if game.winner != 0:
+            game.game_over = True
+            game.state = GAME_OVER
+    
+    game.ai_thinking = False
+    game.ai_think_start_time = None
 
 
 def undo_move():
@@ -297,6 +316,7 @@ def undo_move():
     game.winner = 0
     game.game_over = False
     game.ai_thinking = False
+    game.ai_think_start_time = None
 
 
 
@@ -412,6 +432,8 @@ def handle_playing_state(event):
     if replay_button.draw(Screen):
         game.board.reset()
         game.game_started = False
+        game.ai_thinking = False
+        game.ai_think_start_time = None
         game.state = SETUP
         update_button_states()
         return None
@@ -525,6 +547,8 @@ def main():
                     game.game_started = False
                     game.game_over = False
                     game.winner = 0
+                    game.ai_thinking = False
+                    game.ai_think_start_time = None
                     game.state = SETUP
                     update_button_states()
         
