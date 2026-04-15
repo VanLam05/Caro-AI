@@ -16,6 +16,7 @@ GREEN = (77, 199, 61)
 RED = (199, 36, 55)
 BLUE = (68, 132, 222)
 GRAY = (100, 100, 100)
+YELLOW = (255, 255, 0)
 
 # Game states - simplified to just SETUP and PLAYING
 SETUP = 0
@@ -177,6 +178,7 @@ class GameState:
         self.game_started = False  # True if game has started
         self.ai_think_start_time = None  # Track when AI started thinking
         self.ai_thinking_duration = 500  # milliseconds to wait while thinking
+        self.selected_cell = None  # Track selected cell for preview (row, col) or None
     
     def can_setup(self):
         """Check if we can still change setup (no moves made yet)"""
@@ -208,11 +210,17 @@ def draw_board():
     for row in range(ROWNUM):
         for col in range(COLNUM):
             color = WHITE
-            # Highlight last move
+            # Highlight last move in green
             if len(game.board.move_history) > 0:
                 last_move_row, last_move_col = game.board.move_history[-1][0], game.board.move_history[-1][1]
                 if row == last_move_row and col == last_move_col:
                     color = GREEN
+            
+            # Highlight selected cell in yellow (preview)
+            if game.selected_cell is not None:
+                sel_row, sel_col = game.selected_cell
+                if row == sel_row and col == sel_col:
+                    color = YELLOW
             
             pygame.draw.rect(
                 Screen,
@@ -289,6 +297,7 @@ def make_ai_move():
     
     game.ai_thinking = False
     game.ai_think_start_time = None
+    game.selected_cell = None  # Clear selection after AI move
 
 
 def undo_move():
@@ -311,6 +320,7 @@ def undo_move():
     game.game_over = False
     game.ai_thinking = False
     game.ai_think_start_time = None
+    game.selected_cell = None  # Clear selection on undo
 
 
 
@@ -430,9 +440,10 @@ def handle_playing_state(event):
         game.ai_think_start_time = None
         game.state = SETUP
         update_button_states()
+        game.selected_cell = None
         return None
     
-    # Mouse click for placing piece
+    # Mouse click for placing piece with two-click confirmation
     if event.type == pygame.MOUSEBUTTONDOWN and not game.game_over and not game.ai_thinking:
         pos = pygame.mouse.get_pos()
         col = int(pos[0] // (WIDTH + MARGIN))
@@ -441,11 +452,26 @@ def handle_playing_state(event):
         if col < COLNUM and row < ROWNUM:
             # Check if it's playable turn
             if (game.is_pvp and True) or (not game.is_pvp and game.board.turn == PLAYER_HUMAN):
-                if game.board.make_move(row, col):
-                    game.winner = game.board.get_winner()
-                    if game.winner != 0:
-                        game.game_over = True
-                        game.state = GAME_OVER
+                # Check if cell is occupied
+                if game.board.grid[row][col] != 0:
+                    # Occupied cell - cancel selection
+                    game.selected_cell = None
+                else:
+                    # Empty cell
+                    if game.selected_cell is None:
+                        # First click - select cell for preview
+                        game.selected_cell = (row, col)
+                    elif game.selected_cell == (row, col):
+                        # Second click on same cell - confirm move
+                        if game.board.make_move(row, col):
+                            game.winner = game.board.get_winner()
+                            if game.winner != 0:
+                                game.game_over = True
+                                game.state = GAME_OVER
+                            game.selected_cell = None
+                    else:
+                        # Click on different cell - change preview
+                        game.selected_cell = (row, col)
     
     return None
 
@@ -515,27 +541,22 @@ def main():
                         # Click on board starts the game
                         game.state = PLAYING
                         game.game_started = True
+                        game.selected_cell = None  # Clear any selection
                         if not game.is_pvp:
                             # Select agent based on difficulty
                             if game.difficulty == 0:  # Easy - Random moves
-                                game.agent = AgentRandom(game.board)
-                            elif game.difficulty == 1:  # Medium (1) - Minimax
+                                game.agent = AgentMiniMax(game.board, max_depth=1)
+                            elif game.difficulty == 1:  # Medium - Minimax
                                 game.agent = AgentMiniMax(game.board, max_depth=3)
-                            else:  # Hard (2) - Minimax
+                            else:  # Hard - Minimax
                                 game.agent = AgentMiniMax(game.board, max_depth=5)
                         update_button_states()
                         
                         # Set initial turn based on human_first setting
-                        if game.human_first:
-                            # Human goes first - make move at clicked position
-                            if game.board.make_move(row, col):
-                                game.winner = game.board.get_winner()
-                                if game.winner != 0:
-                                    game.game_over = True
-                                    game.state = GAME_OVER
-                        else:
-                            # AI goes first - set turn to AI and don't make move yet
+                        if not game.human_first:
+                            # AI goes first - set turn to AI
                             game.board.turn = PLAYER_AI
+                        # Human goes first - just transition, yellow cell selection will happen in PLAYING state
             
             elif game.state == PLAYING:
                 result = handle_playing_state(event)
