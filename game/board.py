@@ -198,3 +198,150 @@ class Board(object):
 
     def get_current_XO_for_AI(self):
         return self.AI_turn
+    
+    # ==================== Thêm hàm hỗ trợ cho RL/MCTS ====================
+    
+    def copy(self):
+        """Tạo một bản copy của board hiện tại (cho phép test các nước đi mà không ảnh hưởng bản gốc)"""
+        import copy as copy_module
+        new_board = Board(self.rows, self.cols, self.winning_condition, self.originXO)
+        new_board.grid = copy_module.deepcopy(self.grid)
+        new_board.turn = self.turn
+        new_board.move_history = copy_module.deepcopy(self.move_history)
+        return new_board
+    
+    def get_valid_moves(self):
+        """Tương tự get_possible_moves nhưng tối ưu hơn cho MCTS - trả về list[(x, y)]"""
+        valid_moves = []
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.grid[i][j] == 0:
+                    valid_moves.append((i, j))
+        return valid_moves
+    
+    def get_valid_moves_optimized(self):
+        """
+        Tối ưu cho MCTS: Chỉ trả về các nước đi gần các quân cờ đã có (Locality heuristic)
+        Nếu bàn cờ trống, trả về vài nước đi quanh tâm
+        """
+        if not self.move_history:
+            # Trả về các nước xung quanh tâm bàn cờ nếu trống
+            center = self.rows // 2
+            moves = []
+            for i in range(max(0, center-2), min(self.rows, center+3)):
+                for j in range(max(0, center-2), min(self.cols, center+3)):
+                    if self.grid[i][j] == 0:
+                        moves.append((i, j))
+            return moves
+        
+        # Ngược lại, chỉ xét các nước gần quân cờ cuối cùng
+        last_x, last_y, _ = self.move_history[-1]
+        moves = set()
+        
+        search_range = 3  # Tìm trong bán kính 3 ô xung quanh
+        for i in range(max(0, last_x - search_range), min(self.rows, last_x + search_range + 1)):
+            for j in range(max(0, last_y - search_range), min(self.cols, last_y + search_range + 1)):
+                if self.grid[i][j] == 0:
+                    moves.add((i, j))
+        
+        # Nếu quá ít nước, mở rộng tìm kiếm
+        if len(moves) < 5:
+            for i in range(self.rows):
+                for j in range(self.cols):
+                    if self.grid[i][j] == 0:
+                        moves.add((i, j))
+        
+        return list(moves)
+    
+    def get_state_for_nn(self):
+        """
+        Chuyển đổi board thành định dạng đầu vào cho Neural Network
+        Trả về: numpy array shape [4, rows, cols]
+        - Layer 0: Quân của player hiện tại
+        - Layer 1: Quân của đối thủ
+        - Layer 2: Vị trí của nước đi cuối cùng (one-hot)
+        - Layer 3: Chỉ số lượt đi (normalized)
+        """
+        import numpy as np
+        
+        state = np.zeros((4, self.rows, self.cols), dtype=np.float32)
+        
+        current_player = self.turn
+        opponent_player = -self.turn
+        
+        # Layer 0: Quân của player hiện tại
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.grid[i][j] == current_player:
+                    state[0, i, j] = 1
+        
+        # Layer 1: Quân của đối thủ
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.grid[i][j] == opponent_player:
+                    state[1, i, j] = 1
+        
+        # Layer 2: Vị trí nước đi cuối cùng
+        if self.move_history:
+            last_x, last_y, _ = self.move_history[-1]
+            state[2, last_x, last_y] = 1
+        
+        # Layer 3: Chỉ số lượt đi (normalized)
+        move_count = len(self.move_history)
+        state[3, :, :] = (move_count % 16) / 15.0  # Sử dụng modulo để normalize
+        
+        return state
+    
+    def get_board_dict(self):
+        """
+        Trả về state của board dưới dạng dict (để lưu vào replay buffer)
+        """
+        return {
+            'grid': [row[:] for row in self.grid],
+            'move_history': self.move_history[:],
+            'turn': self.turn,
+            'move_count': len(self.move_history)
+        }
+    
+    def get_game_ended(self):
+        """
+        Kiểm tra trò chơi đã kết thúc chưa
+        Trả về: 
+            - 0: Trò chơi tiếp tục
+            - 1: Quân thứ nhất thắng
+            - -1: Quân thứ hai thắng
+            - 0.5: Hòa (bàn cờ đầy)
+        """
+        if not self.move_history:
+            return 0
+        
+        last_move = self.move_history[-1]
+        x, y, player = last_move
+        
+        if self.check_winning(x, y, player):
+            return 1 if player == self.originXO else -1
+        
+        if self.is_draw():
+            return 0.5  # Draw
+        
+        return 0  # Game continues
+    
+    def get_symmetries(self, state):
+        """
+        Data augmentation: Sinh ra 8 version của board (4 rotations × 2 flips)
+        Trả về list gồm (state, policy_probs) cặp đối xứng
+        """
+        import numpy as np
+        
+        # Rotation 90, 180, 270
+        rotations = [state]
+        for _ in range(3):
+            rotations.append(np.rot90(rotations[-1], axes=(1, 2)))
+        
+        # Mỗi rotation, cộng thêm flip horizontal
+        symmetries = []
+        for rot in rotations:
+            symmetries.append(rot)
+            symmetries.append(np.fliplr(rot))
+        
+        return symmetries
