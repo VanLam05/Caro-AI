@@ -42,8 +42,10 @@ class AgentRL:
 
         # Load checkpoint if provided
         if checkpoint_path is not None and os.path.exists(checkpoint_path):
+            print(f"Loading RL agent from checkpoint: {checkpoint_path}")
             self.net.load_checkpoint(checkpoint_path, device=self.device)
         else:
+            print("No checkpoint path provided or file does not exist. Attempting to load default checkpoint...")
             # Use default checkpoint path
             default_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
