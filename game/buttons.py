@@ -16,7 +16,7 @@ class Button():
 
 	#draw button
 
-	def draw(self, surface):
+	def draw(self, surface): 
 		action = False
 		#get mouse position
 		pos = pygame.mouse.get_pos()
