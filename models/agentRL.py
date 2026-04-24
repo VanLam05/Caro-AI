@@ -40,19 +40,30 @@ class AgentRL:
         )
         self.net.to(self.device)
 
-        # Load checkpoint if provided
+        # Load checkpoint
+        self.model_loaded = False
+
         if checkpoint_path is not None and os.path.exists(checkpoint_path):
-            print(f"Loading RL agent from checkpoint: {checkpoint_path}")
             self.net.load_checkpoint(checkpoint_path, device=self.device)
+            self.model_loaded = True
+            print(f"RL agent loaded trained model from: {checkpoint_path}")
         else:
-            print("No checkpoint path provided or file does not exist. Attempting to load default checkpoint...")
-            # Use default checkpoint path
+            # Try default checkpoint path
             default_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 'neural_net', 'model_checkpoint.pth'
             )
             if os.path.exists(default_path):
                 self.net.load_checkpoint(default_path, device=self.device)
+                self.model_loaded = True
+                print(f"RL agent loaded trained model from: {default_path}")
+
+        if not self.model_loaded:
+            raise FileNotFoundError(
+                "No trained model found. Please train the model first using "
+                "train_colab.ipynb or pipeline/train.py, then place "
+                "model_checkpoint.pth in the neural_net/ directory."
+            )
 
         self.net.eval()
 

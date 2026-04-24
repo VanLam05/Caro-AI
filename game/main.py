@@ -584,11 +584,10 @@ def main():
                                         game.board,
                                         num_simulations=200,
                                     )
-                                    print("RL agent loaded successfully")
-                                except Exception:
-                                    # Fallback to MiniMax if RL model not available
-                                    game.agent = AgentMiniMax(game.board, max_depth=2)
-                                    print("Failed to load RL agent, using MiniMax instead")
+                                except Exception as e:
+                                    print(f"[Hard mode] RL agent not available: {e}")
+                                    print("[Hard mode] Fallback: using MiniMax (depth=5)")
+                                    game.agent = AgentMiniMax(game.board, max_depth=5)
                         update_button_states()
                         
                         # Set initial turn based on human_first setting
