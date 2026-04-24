@@ -4,6 +4,7 @@ import os
 
 from .board import Board
 from models.agentMiniMax import AgentMiniMax
+from models.agentRL import AgentRL
 from .buttons import Button
 
 
@@ -577,8 +578,15 @@ def main():
                                 game.agent = AgentMiniMax(game.board, max_depth=1)
                             elif game.difficulty == 1:  # Medium - Minimax
                                 game.agent = AgentMiniMax(game.board, max_depth=3)
-                            else:  # Hard - Minimax
-                                game.agent = AgentMiniMax(game.board, max_depth=5)
+                            else:  # Hard - AlphaZero RL agent
+                                try:
+                                    game.agent = AgentRL(
+                                        game.board,
+                                        num_simulations=200,
+                                    )
+                                except Exception:
+                                    # Fallback to MiniMax if RL model not available
+                                    game.agent = AgentMiniMax(game.board, max_depth=5)
                         update_button_states()
                         
                         # Set initial turn based on human_first setting

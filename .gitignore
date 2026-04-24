@@ -1,3 +1,12 @@
 venv/
 __pycache__/
 .DS_Store
+
+# Model checkpoints (large binary files - download separately)
+neural_net/model_checkpoint.pth
+neural_net/model_iter_*.pth
+*.pth
+
+# Training data
+pipeline/data/
+*.npy
