@@ -40,6 +40,8 @@ class AgentRL:
         )
         self.net.to(self.device)
 
+
+
         # Load checkpoint if provided
         if checkpoint_path is not None and os.path.exists(checkpoint_path):
             print(f"Loading RL agent from checkpoint: {checkpoint_path}")
@@ -52,6 +54,7 @@ class AgentRL:
                 'neural_net', 'model_checkpoint.pth'
             )
             if os.path.exists(default_path):
+                print(f"Loading default checkpoint: {default_path}")
                 self.net.load_checkpoint(default_path, device=self.device)
 
         self.net.eval()
