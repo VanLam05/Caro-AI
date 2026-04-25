@@ -349,7 +349,9 @@ class AlphaZeroTrainer:
                           winning_condition=5)
             minimax = AgentMiniMax(board, max_depth=minimax_depth)
 
-            rl_player = 1 if game_idx % 2 == 0 else -1
+            # RL always player 1, MiniMax always player -1
+            # (MiniMax heuristic is hardcoded for player -1)
+            rl_player = 1
 
             move_count = 0
             while True:
