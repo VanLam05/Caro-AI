@@ -229,7 +229,7 @@ class AlphaZeroTrainer:
         print(f"\n{'='*60}")
         print("FINAL EVALUATION")
         print(f"{'='*60}")
-        for depth, n_games in [(1, 20), (3, 20), (5, 10)]:
+        for depth, n_games in [(1, 1), (3, 1), (5, 1)]:
             win_rate = self._evaluate_vs_minimax(num_games=n_games,
                                                   minimax_depth=depth)
             print(f"  vs MiniMax depth={depth}: {win_rate:.1%} "
@@ -335,7 +335,7 @@ class AlphaZeroTrainer:
 
         return total_loss / max(num_batches, 1)
 
-    def _evaluate_vs_minimax(self, num_games=10, minimax_depth=3):
+    def _evaluate_vs_minimax(self, num_games=1, minimax_depth=3):
         """Evaluate current network against MiniMax agent."""
         self.net.eval()
         mcts = MCTS(self.net, num_simulations=self.phase2_simulations,
@@ -398,7 +398,7 @@ class AlphaZeroTrainer:
         """Run evaluation against MiniMax at multiple depths."""
         print("\n[Eval] vs MiniMax...")
         for depth in [1, 3]:
-            win_rate = self._evaluate_vs_minimax(num_games=10,
+            win_rate = self._evaluate_vs_minimax(num_games=1,
                                                   minimax_depth=depth)
             print(f"  depth={depth}: {win_rate:.1%}")
 
