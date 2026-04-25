@@ -18,8 +18,9 @@ from models.agentMiniMax import AgentMiniMax
 
 
 def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
-                         num_simulations=200, c_puct=1.5,
-                         temperature_threshold=10):
+                         num_simulations=100, c_puct=2.5,
+                         temperature_threshold=10,
+                         label_smoothing=0.1):
     """
     Play a game between the RL agent (MCTS + net) and a MiniMax agent.
     Collect training data from BOTH sides:
@@ -43,8 +44,9 @@ def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
     mcts = MCTS(net, num_simulations=num_simulations, c_puct=c_puct)
     minimax = AgentMiniMax(board, max_depth=minimax_depth)
 
-    # Randomly assign who goes first
-    rl_player = 1 if np.random.random() < 0.5 else -1
+    # RL always plays as player 1 (goes first).
+    # MiniMax must be player -1 because its heuristic is hardcoded for -1.
+    rl_player = 1
 
     states = []
     policies = []
@@ -96,9 +98,19 @@ def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
                 break
             row, col = move
 
-            # Create one-hot policy from MiniMax's chosen move
+            # Create smoothed policy from MiniMax's chosen move
+            # Label smoothing distributes small probability to other valid moves
+            valid = board.get_valid_moves()
             one_hot_policy = np.zeros(action_size)
-            one_hot_policy[row * board.cols + col] = 1.0
+            if label_smoothing > 0 and len(valid) > 1:
+                smooth_prob = label_smoothing / len(valid)
+                for vr, vc in valid:
+                    one_hot_policy[vr * board.cols + vc] = smooth_prob
+                one_hot_policy[row * board.cols + col] = (
+                    1.0 - label_smoothing + smooth_prob
+                )
+            else:
+                one_hot_policy[row * board.cols + col] = 1.0
 
             states.append(state)
             policies.append(one_hot_policy)
@@ -119,7 +131,7 @@ def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
 
 
 def self_play_game(net, board_size=15, num_simulations=200,
-                   c_puct=1.5, temperature_threshold=15):
+                   c_puct=2.5, temperature_threshold=15):
     """
     Play a single self-play game and collect training data.
 

@@ -67,8 +67,8 @@ class MCTS:
       - value: estimated outcome from the current position
     """
 
-    def __init__(self, neural_net, num_simulations=200, c_puct=1.5,
-                 dirichlet_alpha=0.3, dirichlet_epsilon=0.25):
+    def __init__(self, neural_net, num_simulations=200, c_puct=2.5,
+                 dirichlet_alpha=0.15, dirichlet_epsilon=0.25):
         self.net = neural_net
         self.num_simulations = num_simulations
         self.c_puct = c_puct
