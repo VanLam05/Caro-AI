@@ -221,11 +221,10 @@ class Board(object):
     
     def get_valid_moves_optimized(self):
         """
-        Tối ưu cho MCTS: Chỉ trả về các nước đi gần các quân cờ đã có (Locality heuristic)
-        Nếu bàn cờ trống, trả về vài nước đi quanh tâm
+        Tối ưu cho MCTS: Trả về các nước đi gần TẤT CẢ quân cờ đã có.
+        Nếu bàn cờ trống, trả về vài nước đi quanh tâm.
         """
         if not self.move_history:
-            # Trả về các nước xung quanh tâm bàn cờ nếu trống
             center = self.rows // 2
             moves = []
             for i in range(max(0, center-2), min(self.rows, center+3)):
@@ -233,25 +232,42 @@ class Board(object):
                     if self.grid[i][j] == 0:
                         moves.append((i, j))
             return moves
-        
-        # Ngược lại, chỉ xét các nước gần quân cờ cuối cùng
-        last_x, last_y, _ = self.move_history[-1]
+
         moves = set()
-        
-        search_range = 3  # Tìm trong bán kính 3 ô xung quanh
-        for i in range(max(0, last_x - search_range), min(self.rows, last_x + search_range + 1)):
-            for j in range(max(0, last_y - search_range), min(self.cols, last_y + search_range + 1)):
-                if self.grid[i][j] == 0:
-                    moves.add((i, j))
-        
-        # Nếu quá ít nước, mở rộng tìm kiếm
+        search_range = 2
+
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.grid[i][j] != 0:
+                    for di in range(-search_range, search_range + 1):
+                        for dj in range(-search_range, search_range + 1):
+                            ni, nj = i + di, j + dj
+                            if 0 <= ni < self.rows and 0 <= nj < self.cols \
+                               and self.grid[ni][nj] == 0:
+                                moves.add((ni, nj))
+
         if len(moves) < 5:
             for i in range(self.rows):
                 for j in range(self.cols):
                     if self.grid[i][j] == 0:
                         moves.add((i, j))
-        
+
         return list(moves)
+
+    def find_winning_move(self, player):
+        """
+        Tìm nước đi thắng ngay cho player.
+        Trả về (row, col) nếu có, None nếu không.
+        """
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.grid[i][j] == 0:
+                    self.grid[i][j] = player
+                    if self.check_winning(i, j, player):
+                        self.grid[i][j] = 0
+                        return (i, j)
+                    self.grid[i][j] = 0
+        return None
     
     def get_state_for_nn(self):
         """

@@ -28,7 +28,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from neural_net.architecture import GomokuNet
 from mcts.mcts_alpha_zero import MCTS
-from pipeline.collect_data import collect_vs_minimax_data, collect_self_play_data
+from pipeline.collect_data import (
+    collect_vs_minimax_data, collect_self_play_data, generate_tactical_data
+)
 from game.board import Board
 from models.agentMiniMax import AgentMiniMax
 
@@ -121,6 +123,14 @@ class AlphaZeroTrainer:
         print(f"{'='*60}")
 
         total_start = time.time()
+
+        # Pre-fill buffer with tactical data (winning/blocking patterns)
+        print("\n[Tactical] Generating winning/blocking patterns...")
+        tactical_data = generate_tactical_data(
+            board_size=self.board_size, num_examples=1000
+        )
+        self.replay_buffer.extend(tactical_data)
+        print(f"  +{len(tactical_data)} tactical examples in buffer")
 
         # ============================================================
         # PHASE 1: Learn from MiniMax

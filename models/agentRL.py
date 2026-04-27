@@ -63,7 +63,7 @@ class AgentRL:
         self.mcts = MCTS(
             neural_net=self.net,
             num_simulations=num_simulations,
-            c_puct=1.5,
+            c_puct=2.5,
         )
 
     def get_move(self):

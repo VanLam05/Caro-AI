@@ -346,6 +346,112 @@ def collect_self_play_data(net, num_games=100, board_size=15,
     return all_data
 
 
+def generate_tactical_data(board_size=15, num_examples=500):
+    """
+    Generate synthetic training examples for winning/blocking patterns.
+
+    Creates board positions with 4-in-a-row and teaches the network
+    to play the winning 5th move (or block opponent's 5th).
+
+    Returns:
+        list of (state, policy, value) tuples
+    """
+    data = []
+    action_size = board_size * board_size
+    directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+
+    for _ in range(num_examples):
+        board = Board(rows=board_size, cols=board_size, winning_condition=5)
+        player = board.turn
+        direction = directions[np.random.randint(len(directions))]
+        dr, dc = direction
+
+        # Random starting position (ensure 5 cells fit)
+        max_r = board_size - 1 - max(0, 4 * dr)
+        max_c = board_size - 1 - max(0, 4 * dc)
+        min_r = max(0, -4 * dr)
+        min_c = max(0, -4 * dc)
+
+        if min_r > max_r or min_c > max_c:
+            continue
+
+        start_r = np.random.randint(min_r, max_r + 1)
+        start_c = np.random.randint(min_c, max_c + 1)
+
+        # Place 4 pieces, leave gap at random position for the 5th
+        gap_idx = np.random.randint(5)
+        positions = []
+        for k in range(5):
+            r = start_r + k * dr
+            c = start_c + k * dc
+            positions.append((r, c))
+
+        # Check all positions are valid
+        valid = all(0 <= r < board_size and 0 <= c < board_size
+                    for r, c in positions)
+        if not valid:
+            continue
+
+        # Place 4 of 5 pieces for current player
+        for k in range(5):
+            if k == gap_idx:
+                continue
+            r, c = positions[k]
+            board.grid[r][c] = player
+
+        # Add some random opponent pieces for context
+        num_opp = np.random.randint(3, 8)
+        for _ in range(num_opp):
+            er = np.random.randint(board_size)
+            ec = np.random.randint(board_size)
+            if board.grid[er][ec] == 0:
+                board.grid[er][ec] = -player
+                board.move_history.append((er, ec, -player))
+
+        # Add current player's pieces to history
+        for k in range(5):
+            if k != gap_idx:
+                r, c = positions[k]
+                board.move_history.append((r, c, player))
+
+        # Set turn to current player
+        board.turn = player
+
+        # The winning move is at the gap position
+        win_r, win_c = positions[gap_idx]
+        state = board.get_state_for_nn()
+
+        # Policy: one-hot on winning move
+        policy = np.zeros(action_size)
+        policy[win_r * board_size + win_c] = 1.0
+
+        # Value: +1 (winning position)
+        value = 1.0
+
+        data.append((state, policy, value))
+
+        # Also generate blocking version: opponent's perspective
+        # Flip board: swap player pieces
+        board2 = Board(rows=board_size, cols=board_size, winning_condition=5)
+        for i in range(board_size):
+            for j in range(board_size):
+                if board.grid[i][j] != 0:
+                    board2.grid[i][j] = -board.grid[i][j]
+        board2.turn = -player
+        board2.move_history = [(r, c, -p) for r, c, p in board.move_history]
+
+        state2 = board2.get_state_for_nn()
+        # Policy: must block the same position
+        policy2 = np.zeros(action_size)
+        policy2[win_r * board_size + win_c] = 1.0
+        # Value: -1 (losing if don't block, but blocking saves)
+        value2 = 0.0
+
+        data.append((state2, policy2, value2))
+
+    return data
+
+
 if __name__ == '__main__':
     import torch
     from neural_net.architecture import GomokuNet
@@ -364,3 +470,7 @@ if __name__ == '__main__':
     print("\n--- Testing self-play data collection ---")
     data2 = collect_self_play_data(net, num_games=5, num_simulations=50)
     print(f"Collected {len(data2)} training examples from 5 self-play games")
+
+    print("\n--- Testing tactical data generation ---")
+    data3 = generate_tactical_data(num_examples=100)
+    print(f"Generated {len(data3)} tactical training examples")
