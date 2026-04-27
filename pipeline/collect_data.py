@@ -21,10 +21,13 @@ def _flip_state(state):
     """
     Flip board perspective: swap current player and opponent layers.
     Layer 0 (my pieces) <-> Layer 1 (opponent pieces).
-    Layers 2-3 stay the same.
+    Layer 2 (last move) is cleared because after flipping, the original
+    last move position becomes semantically incorrect.
+    Layer 3 stays the same.
     """
     flipped = state.copy()
     flipped[0], flipped[1] = state[1].copy(), state[0].copy()
+    flipped[2] = np.zeros_like(state[2])
     return flipped
 
 
