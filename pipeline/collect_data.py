@@ -17,6 +17,17 @@ from mcts.mcts_alpha_zero import MCTS
 from models.agentMiniMax import AgentMiniMax
 
 
+def _flip_state(state):
+    """
+    Flip board perspective: swap current player and opponent layers.
+    Layer 0 (my pieces) <-> Layer 1 (opponent pieces).
+    Layers 2-3 stay the same.
+    """
+    flipped = state.copy()
+    flipped[0], flipped[1] = state[1].copy(), state[0].copy()
+    return flipped
+
+
 def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
                          num_simulations=100, c_puct=2.5,
                          temperature_threshold=10,
@@ -27,7 +38,8 @@ def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
       - RL turns: state + MCTS policy + game outcome
       - MiniMax turns: state + one-hot policy of MiniMax move + game outcome
 
-    This teaches the network from MiniMax's "expert" moves, accelerating learning.
+    When MiniMax wins, also generates perspective-flipped data so RL
+    can learn MiniMax's winning strategy from its own perspective.
 
     Args:
         net: GomokuNet neural network
@@ -51,6 +63,11 @@ def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
     states = []
     policies = []
     players = []
+
+    # Track MiniMax moves separately for perspective flipping
+    minimax_states = []
+    minimax_policies = []
+
     action_size = board_size * board_size
 
     move_count = 0
@@ -116,18 +133,71 @@ def play_vs_minimax_game(net, minimax_depth=3, board_size=15,
             policies.append(one_hot_policy)
             players.append(current_player)
 
+            # Save MiniMax state+policy for perspective flipping
+            minimax_states.append(state)
+            minimax_policies.append(one_hot_policy)
+
         board.make_move(row, col)
         move_count += 1
 
         game_result = board.get_game_ended()
         if game_result != 0:
-            return _build_training_data(states, policies, players,
+            data = _build_training_data(states, policies, players,
                                         game_result, board)
+
+            # If MiniMax won, flip its winning moves to teach RL
+            minimax_player = -rl_player
+            minimax_won = (
+                (game_result == 1 and minimax_player == board.originXO) or
+                (game_result == -1 and minimax_player != board.originXO)
+            )
+            if minimax_won and minimax_states:
+                flipped = _build_flipped_data(
+                    minimax_states, minimax_policies, board
+                )
+                data.extend(flipped)
+
+            return data
 
         if move_count >= board.rows * board.cols:
             break
 
     return _build_training_data(states, policies, players, 0.5, board)
+
+
+def _build_flipped_data(minimax_states, minimax_policies, board):
+    """
+    Create training data from MiniMax's perspective flipped to RL's.
+
+    When MiniMax wins, its moves represent a winning strategy.
+    By flipping the board (swapping player/opponent layers), we create
+    examples that teach RL: "in this equivalent position, play this move
+    to win".
+
+    The flipped examples have value=+1 (winning) because MiniMax won
+    using these moves.
+    """
+    flipped_data = []
+
+    for state, policy in zip(minimax_states, minimax_policies):
+        # Flip perspective: swap layer 0 (my pieces) and layer 1 (opponent)
+        flipped_state = _flip_state(state)
+        # Policy stays the same (same move, just from other player's view)
+        # Value = +1 because this move led to winning
+        flipped_data.append((flipped_state, policy, 1.0))
+
+        # Also add augmented versions
+        symmetries = board.get_symmetries(flipped_state)
+        policy_2d = policy.reshape(board.rows, board.cols)
+
+        for sym_state in symmetries[1:]:
+            sym_policy = _transform_policy(
+                policy_2d, sym_state, flipped_state,
+                board.rows, board.cols
+            )
+            flipped_data.append((sym_state, sym_policy, 1.0))
+
+    return flipped_data
 
 
 def self_play_game(net, board_size=15, num_simulations=200,
@@ -399,12 +469,13 @@ def generate_tactical_data(board_size=15, num_examples=500):
             r, c = positions[k]
             board.grid[r][c] = player
 
-        # Add some random opponent pieces for context
+        # Add some random opponent pieces for context (avoid gap position)
+        gap_pos = positions[gap_idx]
         num_opp = np.random.randint(3, 8)
         for _ in range(num_opp):
             er = np.random.randint(board_size)
             ec = np.random.randint(board_size)
-            if board.grid[er][ec] == 0:
+            if board.grid[er][ec] == 0 and (er, ec) != gap_pos:
                 board.grid[er][ec] = -player
                 board.move_history.append((er, ec, -player))
 
