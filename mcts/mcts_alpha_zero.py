@@ -194,7 +194,9 @@ class MCTS:
 
     def get_action(self, board, temperature=0.0):
         """
-        Get action from MCTS search.
+        Get action from MCTS search with tactical override.
+
+        Checks for immediate wins/blocks before running MCTS.
 
         Args:
             board: Board object
@@ -207,6 +209,26 @@ class MCTS:
             action: (row, col) tuple
             action_probs: numpy array of shape (225,)
         """
+        action_size = board.rows * board.cols
+
+        # Tactical override: check immediate win
+        current_player = board.turn
+        win_move = board.find_winning_move(current_player)
+        if win_move is not None:
+            action_probs = np.zeros(action_size)
+            r, c = win_move
+            action_probs[r * board.cols + c] = 1.0
+            return win_move, action_probs
+
+        # Tactical override: block opponent's immediate win
+        opponent = -current_player
+        block_move = board.find_winning_move(opponent)
+        if block_move is not None:
+            action_probs = np.zeros(action_size)
+            r, c = block_move
+            action_probs[r * board.cols + c] = 1.0
+            return block_move, action_probs
+
         action_probs = self.search(board, add_noise=(temperature > 0))
 
         if temperature == 0:
